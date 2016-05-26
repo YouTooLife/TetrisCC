@@ -366,10 +366,8 @@ static void key(unsigned char key, int x, int y)
 {
     //----ESC Handler---//
     if (key == 27) {
-
+        exit(0);
     }
-    //----BACKSPACE Handler---//
-
     //----ENTER Handler---//
     if (key == 13) {
        replay();
@@ -442,7 +440,7 @@ deltaTime /= 1000;
 
 if (!gameOver) {
 timer += deltaTime;
-if (timer >= 0.25) {
+if (timer >= 0.75 - (score<25?score*0.028:0.7)) {
     timer = 0;
     moveFigure(cfig,{0,1});
     if (!moveFigure(cfig,{0,1})) {
@@ -507,6 +505,10 @@ void initGL(int argc, char *argv[])
 
 int main(int argc, char *argv[])
 {
+    printf("input map size: ");
+    scanf("%d", &M);
+    N = M / 2;
+    M += 4;
     initGame();
     //rotateFigure(cfig);
     //drawMap();
