@@ -29,6 +29,7 @@ typedef struct figure {
 char currentColor = 1;
 long score = 0;
 char *scoreText = (char*) calloc(1,sizeof(char));
+char gameOver = 0;
 
 int N = 10;
 int M = 24;
@@ -43,6 +44,10 @@ void *font = GLUT_BITMAP_TIMES_ROMAN_24;
 
 //char map[5][5] = {{0,0,0,0,0},{0,0,0,0,0},{0,0,0,0,0},{0,0,0,0,0},{0,0,0,5,0}};
 char **map;
+
+float oldTimeSinceStart = 0;
+float timer = 0;
+float deltaTime = 0;
 
 Figure line = {0,0,4,{
     {0,0},{1,0},{2,0},{3,0}}};
@@ -153,6 +158,10 @@ void createFigure(Figure *fig) {
 }
 
 void doneFigure(Figure *fig) {
+    if (fig->y < tabTop) {
+        gameOver = 1;
+        return;
+    }
     for (int i = 0; i < (fig->n); i++)
         map[fig->y-fig->cube[i].y][fig->x+fig->cube[i].x]=currentColor;
     createFigure(fig);
@@ -231,18 +240,13 @@ glRasterPos2f(x, y);
 }
 
 void getScoreText() {
-
-printf("1\n");
     int d = 0;
     long sc = score;
     while (sc != 0) {
         realloc(scoreText,(d+1)*sizeof(char));
-        printf("2\n");
         scoreText[d] = '0' + (sc % 10);
-        printf("3\n");
         sc /= 10;
         d++;
-        printf("%d1\n",d);
     }
     for (int i = 0; i < (d/2); i++) {
         char buf = scoreText[i];
@@ -252,6 +256,22 @@ printf("1\n");
 }
 
 void drawMap() {
+
+    float quadSize = ((float)(height-75-30-15) / (float)M);
+
+  float sX = width/2 - quadSize*(N/2);
+  float sY = height - quadSize - 75-30;
+
+  glColor4f(1.0, 1.0, 1.0, 0.7);
+  printfMe(sX-75,sY+45, "Welcome to Tetris CC!");
+
+  getScoreText();
+  char *zero = "0";
+  printfMe(sX+quadSize*N+30,sY - 30, addStr("SCORE: ",(score>0?scoreText:zero)));
+  if (gameOver) {
+  printfMe(sX-75,sY-45-45, "GAME OVER!");
+    return;
+  }
 
     /*printf("..::TetrisCC::..::ver..::..alpha::..\n");
     printf("::::::::::::::::::::::::::::::::::::\n");
@@ -266,15 +286,6 @@ void drawMap() {
 
     for (int i = 0; i < (cfig->n); i++)
         dm[cfig->y-cfig->cube[i].y][cfig->x+cfig->cube[i].x]= currentColor;
-
-
-  float quadSize = ((float)(height-75-30-15) / (float)M);
-
-  float sX = width/2 - quadSize*(N/2);
-  float sY = height - quadSize - 75-30;
-
-  glColor4f(1.0, 1.0, 1.0, 0.7);
-  printfMe(sX-75,sY+45, "Welcome to Tetris CC!");
 
             glColor4f(1.0, 1.0, 1.0, 0.1);
             glBegin(GL_QUADS);
@@ -322,9 +333,28 @@ void drawMap() {
     }
     //printf("|----------------------------------|\n");
     delete dm;
-    glColor4f(1.0, 1.0, 1.0, 0.7);
-    getScoreText();
-    printfMe(sX+quadSize*N+30,sY - 30, addStr("SCORE: ", scoreText));
+}
+
+void replay() {
+for (int i = 0; i < M;i++) {
+for (int j = 0; j < N; j++)
+map[i][j] = 0;
+}
+score = 0;
+gameOver = 0;
+createFigure(cfig);
+}
+
+void initGame() {
+    srand(time(NULL));
+    map = (char**)malloc(M*sizeof(char*));
+    for (int i = 0; i < M;i++) {
+        map[i] = (char*)malloc(N*sizeof(char));
+        for (int j = 0; j < N; j++)
+            map[i][j] = 0;
+    }
+    memcpy(cfig,&triangle,sizeof(Figure));
+    createFigure(cfig);
 }
 
 
@@ -342,10 +372,15 @@ static void key(unsigned char key, int x, int y)
 
     //----ENTER Handler---//
     if (key == 13) {
-
+       replay();
     }
-    if (key == 'w')
-            moveFigure(cfig,{0,-1});
+
+    if (gameOver) {
+            glutPostRedisplay();
+        return;
+    }
+    /*if (key == 'w')
+            moveFigure(cfig,{0,-1});*/
         if (key == 's')
             moveFigure(cfig,{0,1});
         if (key == 'a')
@@ -358,7 +393,6 @@ static void key(unsigned char key, int x, int y)
             doneFigure(cfig);
         if (key == 'v')
             createFigure(cfig);
-        system("cls");
 
         if (!moveFigure(cfig,{0,1})) {
             doneFigure(cfig);
@@ -367,6 +401,8 @@ static void key(unsigned char key, int x, int y)
         else {
             moveFigure(cfig,{0,-1});
         }
+
+
     //----QUIT Handler----//
     if (key == 'q') {
         exit(0);
@@ -395,9 +431,37 @@ static void specialKeys(int key, int x, int y ) {
 glutPostRedisplay();
 }
 
+static void idle(void)
+{
+
+    float timeSinceStart = glutGet(GLUT_ELAPSED_TIME);
+deltaTime = timeSinceStart - oldTimeSinceStart;
+oldTimeSinceStart = timeSinceStart;
+
+deltaTime /= 1000;
+
+if (!gameOver) {
+timer += deltaTime;
+if (timer >= 0.25) {
+    timer = 0;
+    moveFigure(cfig,{0,1});
+    if (!moveFigure(cfig,{0,1})) {
+            doneFigure(cfig);
+            moveMap();
+        }
+        else {
+            moveFigure(cfig,{0,-1});
+        }
+}
+}
+    glutPostRedisplay();
+}
+
 //-----Draw-----//
 static void display(void)
 {
+
+
 glClearColor(0.0,0.0,0.0,1.0);
 glClear(GL_COLOR_BUFFER_BIT);
         //-----Draw ----//
@@ -435,6 +499,7 @@ void initGL(int argc, char *argv[])
         glutDisplayFunc(display);
         glutSpecialFunc(specialKeys);
         glutKeyboardFunc(key);
+        glutIdleFunc(idle);
         glEnable(GL_POINT_SMOOTH);
         glutMainLoop();
 }
@@ -442,16 +507,7 @@ void initGL(int argc, char *argv[])
 
 int main(int argc, char *argv[])
 {
-    srand(time(NULL));
-    map = (char**)malloc(M*sizeof(char*));
-    for (int i = 0; i < M;i++) {
-        map[i] = (char*)malloc(N*sizeof(char));
-        for (int j = 0; j < N; j++)
-            map[i][j] = 0;
-    }
-
-    memcpy(cfig,&triangle,sizeof(Figure));
-    cfig->y = 1;
+    initGame();
     //rotateFigure(cfig);
     //drawMap();
 
